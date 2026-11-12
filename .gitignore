@@ -1,0 +1,13 @@
+# 忽略构建产物
+dist/
+*.exe
+*.zip
+汉化日志.txt
+AION2汉化诊断_*.txt
+
+# Python
+__pycache__/
+*.pyc
+
+# 临时
+_staging_login/
