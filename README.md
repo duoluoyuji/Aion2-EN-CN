@@ -19,12 +19,7 @@
 | 还原 | 依赖备份，更新后可能还原旧版 | 删文件即可，无需备份 |
 | 游戏更新 | 每次都要重新适配整包 | 旧译文继续生效，只需补新增条目 |
 
-原理：UE 在运行时按语言目录加载松散的本地化文件。官方客户端本身不自带任何 locres，所以磁盘上这两个文件就是唯一来源。
 
-```
-Aion2\Engine\Content\Localization\Engine\Platforms\Windows\en\Engine.locres
-Aion2\Engine\Content\Localization\Engine\Platforms\Windows\en-US\Engine.locres
-```
 
 ---
 
@@ -58,15 +53,15 @@ Aion2\Engine\Content\Localization\Engine\Platforms\Windows\en-US\Engine.locres
 
 ## 还原
 
-点「一键还原官方英文」，或手动删除上面那两条 `Engine.locres`。
+点「一键还原官方英文」。
 
-删掉即恢复官方英文，没有备份文件残留，也不需要 Steam 校验。
+没有备份文件残留，也不需要 Steam 校验。
 
 ---
 
 ## 已知问题
 
-1. 登录页底部有 4 行英文（网络延迟提示）不走 locres，英文入口下无法汉化
+1. 登录页底部有 4 行英文，英文入口下无法汉化
 2. 数量单位显示为 `K`。程序固定先除以 1000 再拼单位，改成「万」会让数值错十倍，因此保留
 3. 只支持英文入口；切到日语、韩语等其它语言不生效
 4. 修改客户端可能违反游戏服务条款，风险自担
@@ -76,7 +71,7 @@ Aion2\Engine\Content\Localization\Engine\Platforms\Windows\en-US\Engine.locres
 ## 更新日志
 
 ### v2.0.0
-- 改为英文入口 locres 方案，不再修改任何 pak 与字体
+- 改为英文入口方案，不再修改任何 pak 与字体
 - 界面明确标注「仅适用英文客户端」
 - 还原改为删除文件，不再残留备份目录
 
