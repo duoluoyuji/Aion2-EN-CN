@@ -1,7 +1,7 @@
 ﻿# -*- coding: utf-8 -*-
 # AION 2 (Steam / PURPLE 正式版·英文入口) 简繁双语一键汉化与还原工具
 # 作者: B站@吃素的佩奇
-# 开源主页: https://github.com/duoluoyuji/Aion2-Steam-CN
+# 开源主页: https://github.com/duoluoyuji/Aion2-EN-CN
 
 param(
     [switch]$Install,
@@ -31,8 +31,8 @@ if ($Lang -eq 'zh-TW' -or $Lang -eq 'tw' -or $Lang -eq 'cht') {
 $CurrentVersion = '2.0.0'
 # 3393110 为 Steam 正式服 AppID，4972320 为 Steam Playtest 测试服 AppID
 $AppIds         = @('3393110', '4972320')
-$RemoteVersionUrl   = 'https://raw.githubusercontent.com/duoluoyuji/Aion2-Steam-CN/main/version.json'
-$FallbackVersionUrl = 'https://ghp.ci/https://raw.githubusercontent.com/duoluoyuji/Aion2-Steam-CN/main/version.json'
+$RemoteVersionUrl   = 'https://raw.githubusercontent.com/duoluoyuji/Aion2-EN-CN/main/version.json'
+$FallbackVersionUrl = 'https://ghp.ci/https://raw.githubusercontent.com/duoluoyuji/Aion2-EN-CN/main/version.json'
 
 # ==================== 客户端状态检测 ====================
 function Get-Sha256([string]$Path) {
@@ -74,7 +74,7 @@ function Show-Banner {
     Write-Host "========================================================================" -ForegroundColor Magenta
     Write-Host "      AION 2 (Steam / PURPLE 正式版) 简繁双语一键汉化工具 · 英文入口 v$CurrentVersion" -ForegroundColor Cyan
     Write-Host "      制作团队: 吃素的佩奇汉化" -ForegroundColor Gray
-    Write-Host "      开源主页: https://github.com/duoluoyuji/Aion2-Steam-CN" -ForegroundColor Gray
+    Write-Host "      开源主页: https://github.com/duoluoyuji/Aion2-EN-CN" -ForegroundColor Gray
     Write-Host "      【声明】本工具完全免费分享，仅供交流学习，严禁倒卖牟利！" -ForegroundColor Red
     Write-Host "========================================================================" -ForegroundColor Magenta
     Write-Host ""
@@ -124,10 +124,10 @@ function Check-Update {
             $box = [System.Windows.Forms.MessageBox]::Show($tip, "版本更新提示 - B站@吃素的佩奇", [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]::Question)
             if ($box -eq [System.Windows.Forms.DialogResult]::Yes) {
                 try {
-                    Start-Process "https://github.com/duoluoyuji/Aion2-Steam-CN/releases"
+                    Start-Process "https://github.com/duoluoyuji/Aion2-EN-CN/releases"
                 } catch {
                     try {
-                        [System.Diagnostics.Process]::Start((New-Object System.Diagnostics.ProcessStartInfo("https://github.com/duoluoyuji/Aion2-Steam-CN/releases") -Property @{UseShellExecute=$true}))
+                        [System.Diagnostics.Process]::Start((New-Object System.Diagnostics.ProcessStartInfo("https://github.com/duoluoyuji/Aion2-EN-CN/releases") -Property @{UseShellExecute=$true}))
                     } catch {}
                 }
             }

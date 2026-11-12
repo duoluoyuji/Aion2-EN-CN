@@ -303,8 +303,8 @@ namespace Aion2CN {
             var th = new Thread(() => {
                 string remoteJson = null;
                 string[] urls = new string[] {
-                    "https://raw.githubusercontent.com/duoluoyuji/Aion2-Steam-CN/main/version.json",
-                    "https://ghp.ci/https://raw.githubusercontent.com/duoluoyuji/Aion2-Steam-CN/main/version.json"
+                    "https://raw.githubusercontent.com/duoluoyuji/Aion2-EN-CN/main/version.json",
+                    "https://ghp.ci/https://raw.githubusercontent.com/duoluoyuji/Aion2-EN-CN/main/version.json"
                 };
                 foreach (string u in urls) {
                     try {
@@ -338,7 +338,7 @@ namespace Aion2CN {
                             "\n\n公告内容：\n" + ann + "\n\n是否立即打开下载页面？",
                             "版本更新提示 - B站@吃素的佩奇", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
                         if (res == DialogResult.Yes) {
-                            try { Process.Start("https://github.com/duoluoyuji/Aion2-Steam-CN/releases"); } catch {}
+                            try { Process.Start("https://github.com/duoluoyuji/Aion2-EN-CN/releases"); } catch {}
                         }
                     }));
                 } catch {}
