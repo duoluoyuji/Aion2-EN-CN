@@ -32,7 +32,7 @@ $CurrentVersion = '2.0.0'
 # 3393110 为 Steam 正式服 AppID，4972320 为 Steam Playtest 测试服 AppID
 $AppIds         = @('3393110', '4972320')
 $RemoteVersionUrl   = 'https://raw.githubusercontent.com/duoluoyuji/Aion2-EN-CN/main/version.json'
-$FallbackVersionUrl = 'https://ghp.ci/https://raw.githubusercontent.com/duoluoyuji/Aion2-EN-CN/main/version.json'
+$FallbackVersionUrl = 'https://gh-proxy.com/https://raw.githubusercontent.com/duoluoyuji/Aion2-EN-CN/main/version.json'
 
 # ==================== 客户端状态检测 ====================
 function Get-Sha256([string]$Path) {
@@ -85,6 +85,7 @@ function Check-Update {
     Write-Host "[0/4] 正在检查最新版本更新与公告..." -ForegroundColor DarkGray
     $remoteJson = $null
     $urls = @($RemoteVersionUrl, $FallbackVersionUrl)
+    try { [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]3072 } catch {}
     
     foreach ($u in $urls) {
         try {

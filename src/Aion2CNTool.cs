@@ -302,9 +302,10 @@ namespace Aion2CN {
         private void CheckUpdate() {
             var th = new Thread(() => {
                 string remoteJson = null;
+                try { System.Net.ServicePointManager.SecurityProtocol = (System.Net.SecurityProtocolType)3072; } catch {}
                 string[] urls = new string[] {
                     "https://raw.githubusercontent.com/duoluoyuji/Aion2-EN-CN/main/version.json",
-                    "https://ghp.ci/https://raw.githubusercontent.com/duoluoyuji/Aion2-EN-CN/main/version.json"
+                    "https://gh-proxy.com/https://raw.githubusercontent.com/duoluoyuji/Aion2-EN-CN/main/version.json"
                 };
                 foreach (string u in urls) {
                     try {
