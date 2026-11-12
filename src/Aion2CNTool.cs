@@ -18,8 +18,8 @@ using Microsoft.Win32;
 [assembly: AssemblyCopyright("Copyright © 2026 B站@吃素的佩奇")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
-[assembly: AssemblyVersion("2.0.0.0")]
-[assembly: AssemblyFileVersion("2.0.0.0")]
+[assembly: AssemblyVersion("2.0.1.0")]
+[assembly: AssemblyFileVersion("2.0.1.0")]
 
 namespace Aion2CN {
     public class ClientTarget {
@@ -57,7 +57,7 @@ namespace Aion2CN {
         private string toolDir;
         private string zhDir;
         private string zhTwDir;
-        private string currentVersion = "2.0.0";
+        private string currentVersion = "2.0.1";
         private string[] appIds = new string[] { "3393110", "4972320" };
 
         // 英文入口唯一可用的汉化通道：这两个 Engine.locres。
