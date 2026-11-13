@@ -10,7 +10,7 @@ $ErrorActionPreference = 'Stop'
 
 $Root    = Split-Path $PSScriptRoot -Parent
 $Base    = Split-Path $Root -Parent          # 1_文本汉化包
-$Version = '2.0.3'
+$Version = '2.0.4'
 $OutName = "Aion2-EN-CN-v$Version"
 $Dist    = Join-Path $Root "dist\$OutName"
 $Csc     = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'

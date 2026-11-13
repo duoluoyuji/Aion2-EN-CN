@@ -28,7 +28,7 @@ if ($Lang -eq 'zh-TW' -or $Lang -eq 'tw' -or $Lang -eq 'cht') {
     $ActiveSourceDir = $ZhTwDir
     $LangName = '繁体中文'
 }
-$CurrentVersion = '2.0.3'
+$CurrentVersion = '2.0.4'
 # 3393110 为 Steam 正式服 AppID，4972320 为 Steam Playtest 测试服 AppID
 $AppIds         = @('3393110', '4972320')
 $RemoteVersionUrl   = 'https://raw.githubusercontent.com/duoluoyuji/Aion2-EN-CN/main/version.json'
@@ -685,6 +685,11 @@ Show-Banner
 
 # ==================== 安全文件操作（防只读属性与文件锁） ====================
 function Safe-CopyFile($src, $dst) {
+    # 全新客户端里没有 Localization 目录，必须先建出来，否则会报“未能找到路径的一部分”
+    $dstDir = Split-Path $dst -Parent
+    if ($dstDir -and -not (Test-Path $dstDir)) {
+        New-Item -ItemType Directory -Path $dstDir -Force | Out-Null
+    }
     if (Test-Path $dst) {
         Set-ItemProperty -Path $dst -Name IsReadOnly -Value $false -ErrorAction SilentlyContinue
     }
