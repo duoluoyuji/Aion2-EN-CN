@@ -1,6 +1,13 @@
 ﻿#requires -Version 4.0
 # AION2 汉化一键诊断（只读，不修改任何游戏文件）
 # 输出：同目录 AION2汉化诊断_时间.txt，把该文件发给作者即可
+#
+# 判断依据（不读取作者本机的任何状态）：
+#   1. 工具包完整性：跟脚本里写死的载荷尺寸/SHA256 比对（这两个值就是随包发布的那两个文件）
+#   2. 汉化是否装对：比对游戏里 en / en-US 的 Engine.locres 是否等于上面两个载荷
+#   3. 游戏原始文件：只有「尺寸与基准完全相同、内容却不同」才判为被改动；
+#      尺寸不同一律视为游戏已更新，只记录、不报错（避免更新后全员误报）
+#   4. 其余为固定规则：目录能否写入、存档语言、旧方案残留、日志关键词
 $ErrorActionPreference = 'SilentlyContinue'
 $ProgressPreference = 'SilentlyContinue'
 
@@ -10,10 +17,12 @@ $ToolName = 'AION2 英文入口汉化工具'
 $ZH = @{ Rel = 'zh\Engine.locres';    Size = 15786542; Hash = '20169D244C1FB9D578FD91278E678C9E44041FC8414A255C5253AB21F6C1568F' }
 $TW = @{ Rel = 'zh-TW\Engine.locres'; Size = 15786612; Hash = '97695A94DD5806978F64D412672B59A122ECD74123A3C5A3845411307ADB2DF8' }
 
-# ===== 官方 pak 基准 =====
+# ===== 游戏原始文件基准（仅用于识别「被旧方案原地改过」，不用于判定游戏版本）=====
+# 游戏每次更新 pak 都会变，所以这里只在「尺寸相同、内容不同」时才判为被改动；
+# 尺寸不同说明版本不一样，属正常情况，不报错。
 $OFFICIAL = @{
-    'Aion2\Content\Paks\pakchunk0-Windows.pak'                                = '6B0C57CC50F949EDB4F47D0A04E859951E2213130FD415D6B19B195767565681'
-    'Aion2\Content\Paks\L10N\Text\en-US\pakchunk502000-Windows_0_P.pak'       = '94F59B218B42CEC2ADD7B0275C6A105CEB3A0A3D92075A1FA621FE4DE06822B8'
+    'Aion2\Content\Paks\pakchunk0-Windows.pak'                          = @{ Size = 34330774; Hash = '6B0C57CC50F949EDB4F47D0A04E859951E2213130FD415D6B19B195767565681' }
+    'Aion2\Content\Paks\L10N\Text\en-US\pakchunk502000-Windows_0_P.pak' = @{ Size = 3980982;  Hash = '94F59B218B42CEC2ADD7B0275C6A105CEB3A0A3D92075A1FA621FE4DE06822B8' }
 }
 
 $LOC_CULTURES = @('en', 'en-US')
@@ -230,19 +239,28 @@ function Get-ClientState($root) {
     if ($writable) { $wtext = '可写入' }
     D ("   目录写测试: " + $wtext)
 
-    # pak 是否官方
+    # pak 是否被旧方案改过（只在「尺寸相同、内容不同」时判定，游戏更新不误报）
     $pakBad = @()
     foreach ($rel in $OFFICIAL.Keys) {
+        $base = $OFFICIAL[$rel]
+        $leaf = Split-Path $rel -Leaf
         $p = Join-Path $root $rel
         if (-not (Test-Path -LiteralPath $p)) {
-            $pakBad += ((Split-Path $rel -Leaf) + ' 缺失')
-            D ("   文件 " + (Split-Path $rel -Leaf) + ": 缺失")
+            $pakBad += ($leaf + ' 缺失')
+            D ("   文件 " + $leaf + ": 缺失")
             continue
         }
-        $h = Sha $p
-        $state = '官方原版'
-        if ($h -ne $OFFICIAL[$rel]) { $pakBad += ((Split-Path $rel -Leaf) + ' 非官方'); $state = '已被改动' }
-        D ("   文件 " + (Split-Path $rel -Leaf) + ": " + $state)
+        $i = Get-Item -LiteralPath $p
+        if ($i.Length -ne $base.Size) {
+            D ("   文件 " + $leaf + ": 与工具记录版本不同（" + $i.Length + " B，游戏可能已更新，属正常）")
+            continue
+        }
+        if ((Sha $p) -ne $base.Hash) {
+            $pakBad += ($leaf + ' 被改动')
+            D ("   文件 " + $leaf + ": 已被改动（尺寸相同、内容不同）")
+        } else {
+            D ("   文件 " + $leaf + ": 官方原版")
+        }
     }
 
     # 旧方案残留
@@ -310,10 +328,10 @@ foreach ($c in $candidates) {
         }
     }
     if ($s.PakBad.Count -gt 0) {
-        AddProblem ('发现游戏原始文件被改动：' + ($s.PakBad -join '、')) '请用 Steam 验证游戏文件完整性，恢复官方原版后再安装本工具' 'error'
+        AddProblem ('游戏原始文件与官方不一致：' + ($s.PakBad -join '、')) '本方案不改 pak；若装过旧日文方案请先还原，再用 Steam 验证文件完整性后重新安装' 'warn'
     }
-    if (-not $s.LocExists -and ($candidates.Count -ge 1)) {
-        AddProblem ('汉化文件没有写进游戏（不存在 Localization 目录）：' + $c.Path) '请用本工具重新点一次「一键应用」，并留意工具窗口里的报错' 'error'
+    if (-not $s.LocExists -and -not $s.HasZh -and -not $s.HasTw) {
+        D '   说明: 没有 Localization 目录 = 从未安装过本汉化，属正常'
     }
     if (-not $s.Writable) {
         AddProblem ('游戏目录无法写入：' + $c.Path) '关闭杀毒软件/安全卫士后重试，或用管理员身份运行工具' 'error'
