@@ -1,5 +1,5 @@
 {
-  "version": "2.0.2",
-  "announcement": "v2.0.2：修正诊断工具误报（游戏更新后不再把 pak 判成被改动，没装过汉化也不再算错误）。",
+  "version": "2.0.3",
+  "announcement": "v2.0.3：修正「找不到游戏路径」，支持任意盘符/自定义 Steam 库文件夹；手动选择目录会自动纠正。",
   "download": "https://github.com/duoluoyuji/Aion2-EN-CN/releases/latest"
 }
