@@ -18,8 +18,8 @@ using Microsoft.Win32;
 [assembly: AssemblyCopyright("Copyright © 2026 B站@吃素的佩奇")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
-[assembly: AssemblyVersion("2.0.2.0")]
-[assembly: AssemblyFileVersion("2.0.2.0")]
+[assembly: AssemblyVersion("2.0.3.0")]
+[assembly: AssemblyFileVersion("2.0.3.0")]
 
 namespace Aion2CN {
     public class ClientTarget {
@@ -57,7 +57,7 @@ namespace Aion2CN {
         private string toolDir;
         private string zhDir;
         private string zhTwDir;
-        private string currentVersion = "2.0.2";
+        private string currentVersion = "2.0.3";
         private string[] appIds = new string[] { "3393110", "4972320" };
 
         // 英文入口唯一可用的汉化通道：这两个 Engine.locres。
@@ -439,21 +439,20 @@ namespace Aion2CN {
                 dlg.ShowNewFolderButton = false;
                 if (dlg.ShowDialog() == DialogResult.OK) {
                     string sel = dlg.SelectedPath.TrimEnd('\\', '/');
-                    string checkExe = Path.Combine(sel, @"Aion2\Binaries\Win64\Aion2-Win64-Shipping.exe");
-                    string checkPak = Path.Combine(sel, @"Aion2\Content\Paks\L10N");
-                    if (File.Exists(checkExe) || Directory.Exists(checkPak)) {
+                    string root = ResolveGameRoot(sel);
+                    if (root != null) {
                         foreach (var cur in detectedRoots) {
-                            if (string.Equals(cur.Path.TrimEnd('\\', '/'), sel, StringComparison.OrdinalIgnoreCase)) {
+                            if (string.Equals(cur.Path.TrimEnd('\\', '/'), root, StringComparison.OrdinalIgnoreCase)) {
                                 MessageBox.Show("该客户端路径已存在于列表中！", "已存在", MessageBoxButtons.OK, MessageBoxIcon.Information);
                                 return;
                             }
                         }
-                        var target = new ClientTarget { ClientType = "手动指定客户端", Path = sel };
+                        var target = new ClientTarget { ClientType = "手动指定客户端", Path = root };
                         detectedRoots.Add(target);
                         chkListClients.Items.Add(target.ToString(), true);
-                        AppendLog("手动添加游戏目录成功: " + sel);
+                        AppendLog("手动添加游戏目录成功: " + root);
                     } else {
-                        MessageBox.Show("所选目录未检测到有效 AION 2 游戏文件！\n请确保所选目录包含 Aion2 文件夹。", "路径无效", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        MessageBox.Show("所选目录里没有 Aion2\\Content\\Paks，不是有效的 AION 2 游戏目录。\n\n最简单的办法：Steam 里右键游戏 → 管理 → 浏览本地文件，复制地址栏的路径，再重试。", "路径无效", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     }
                 }
             }
@@ -521,6 +520,42 @@ namespace Aion2CN {
             list.Add(new ClientTarget { ClientType = clientType, Path = cleanPath });
         }
 
+        // 只要根目录下有 Aion2\Content\Paks 就算有效客户端（不依赖语言包目录）
+        private bool IsGameRoot(string p) {
+            if (string.IsNullOrEmpty(p)) return false;
+            return Directory.Exists(Path.Combine(p, @"Aion2\Content\Paks"));
+        }
+
+        // 把用户选中的目录纠正成真正的游戏根目录（兼容选到 Aion2、common、steamapps）
+        private string ResolveGameRoot(string sel) {
+            if (string.IsNullOrEmpty(sel)) return null;
+            sel = sel.TrimEnd('\\', '/');
+            if (string.Equals(Path.GetFileName(sel), "steamapps", StringComparison.OrdinalIgnoreCase)) {
+                sel = Path.Combine(sel, "common");
+            }
+            var cands = new List<string>();
+            cands.Add(sel);
+            string p1 = Path.GetDirectoryName(sel);
+            if (!string.IsNullOrEmpty(p1)) {
+                cands.Add(p1);
+                string p2 = Path.GetDirectoryName(p1);
+                if (!string.IsNullOrEmpty(p2)) cands.Add(p2);
+            }
+            foreach (var c in cands) {
+                if (IsGameRoot(c)) return c;
+                try {
+                    if (Directory.Exists(c)) {
+                        var subs = new List<string>();
+                        foreach (var d in Directory.GetDirectories(c)) {
+                            if (IsGameRoot(d)) subs.Add(d);
+                        }
+                        if (subs.Count == 1) return subs[0];
+                    }
+                } catch {}
+            }
+            return null;
+        }
+
         private List<ClientTarget> ScanAllGameRoots() {
             var results = new List<ClientTarget>();
             var drives = DriveInfo.GetDrives();
@@ -559,6 +594,40 @@ namespace Aion2CN {
                 }
             } catch {}
 
+            // 1.1 读取 Steam 库清单 libraryfolders.vdf，兼容自定义库名/其它盘的游戏库
+            var vdfFiles = new List<string>();
+            try {
+                foreach (var sa0 in steamAppsCandidates.ToArray()) {
+                    string steamRoot = Path.GetDirectoryName(sa0);
+                    if (!string.IsNullOrEmpty(steamRoot)) {
+                        vdfFiles.Add(Path.Combine(steamRoot, @"config\libraryfolders.vdf"));
+                        vdfFiles.Add(Path.Combine(sa0, "libraryfolders.vdf"));
+                    }
+                }
+                using (var steamKey2 = Registry.CurrentUser.OpenSubKey(@"Software\Valve\Steam")) {
+                    if (steamKey2 != null) {
+                        object sp2 = steamKey2.GetValue("SteamPath");
+                        if (sp2 != null) {
+                            string sp = sp2.ToString().Replace('/', '\\');
+                            vdfFiles.Add(Path.Combine(sp, @"config\libraryfolders.vdf"));
+                        }
+                    }
+                }
+            } catch {}
+            foreach (var v in vdfFiles) {
+                if (!File.Exists(v)) continue;
+                try {
+                    string vt = File.ReadAllText(v);
+                    foreach (Match m in Regex.Matches(vt, "\"path\"\\s+\"([^\"]+)\"")) {
+                        string lib = m.Groups[1].Value.Replace("\\\\", "\\");
+                        string saAdd = Path.Combine(lib, "steamapps");
+                        if (Directory.Exists(saAdd) && !steamAppsCandidates.Contains(saAdd)) {
+                            steamAppsCandidates.Add(saAdd);
+                        }
+                    }
+                } catch {}
+            }
+
             foreach (var sa in steamAppsCandidates) {
                 foreach (var aid in appIds) {
                     string acf = Path.Combine(sa, "appmanifest_" + aid + ".acf");
@@ -568,7 +637,7 @@ namespace Aion2CN {
                             var m = Regex.Match(content, "\"installdir\"\\s+\"([^\"]+)\"");
                             if (m.Success) {
                                 string gameDir = Path.Combine(Path.Combine(sa, "common"), m.Groups[1].Value);
-                                if (Directory.Exists(Path.Combine(gameDir, @"Aion2\Content\Paks\L10N"))) {
+                                if (IsGameRoot(gameDir)) {
                                     string label = (aid == "3393110") ? "Steam 国际正式服" : "Steam 测试服";
                                     AddTargetIfNotExists(results, label, gameDir);
                                 }
@@ -581,7 +650,7 @@ namespace Aion2CN {
                 if (Directory.Exists(common)) {
                     try {
                         foreach (var dir in Directory.GetDirectories(common)) {
-                            if (Directory.Exists(Path.Combine(dir, @"Aion2\Content\Paks\L10N"))) {
+                            if (IsGameRoot(dir)) {
                                 string dirName = Path.GetFileName(dir);
                                 AddTargetIfNotExists(results, "Steam 游戏库 (" + dirName + ")", dir);
                             }
@@ -619,9 +688,32 @@ namespace Aion2CN {
                     Path.Combine(r, @"Program Files (x86)\NCSOFT\Purple\AION 2")
                 };
                 foreach (var pc in purpleCandidates) {
-                    if (Directory.Exists(Path.Combine(pc, @"Aion2\Content\Paks\L10N"))) {
+                    if (IsGameRoot(pc)) {
                         AddTargetIfNotExists(results, "NCSoft PURPLE 客户端 (磁盘扫描)", pc);
                     }
+                }
+            }
+
+            // 3. 兜底：每个盘浅层看两层，兼容任意自定义安装位置
+            string[] skipNames = new string[] { "Windows", "$Recycle.Bin", "System Volume Information", "Config.Msi", "Recovery", "PerfLogs", "AppData" };
+            foreach (var d in drives) {
+                if (!d.IsReady) continue;
+                string[] tops;
+                try { tops = Directory.GetDirectories(d.RootDirectory.FullName); } catch { continue; }
+                foreach (var t in tops) {
+                    string tn = Path.GetFileName(t);
+                    if (Array.IndexOf(skipNames, tn) >= 0) continue;
+                    if (IsGameRoot(t)) {
+                        AddTargetIfNotExists(results, "磁盘扫描 (" + tn + ")", t);
+                        continue;
+                    }
+                    try {
+                        foreach (var g in Directory.GetDirectories(t)) {
+                            if (IsGameRoot(g)) {
+                                AddTargetIfNotExists(results, "磁盘扫描 (" + tn + "\\" + Path.GetFileName(g) + ")", g);
+                            }
+                        }
+                    } catch {}
                 }
             }
 
@@ -638,7 +730,7 @@ namespace Aion2CN {
                                     object baseDir = app.GetValue("BaseDir");
                                     if (baseDir != null) {
                                         string b = baseDir.ToString().TrimEnd('\\', '/');
-                                        if (Directory.Exists(Path.Combine(b, @"Aion2\Content\Paks\L10N"))) {
+                                        if (IsGameRoot(b)) {
                                             AddTargetIfNotExists(results, "NCSoft PURPLE 客户端 (注册表定位)", b);
                                         }
                                     }
@@ -663,7 +755,7 @@ namespace Aion2CN {
                                         string n = name.ToString();
                                         string l = loc.ToString().TrimEnd('\\', '/');
                                         if ((n.IndexOf("AION", StringComparison.OrdinalIgnoreCase) >= 0 || n.IndexOf("Purple", StringComparison.OrdinalIgnoreCase) >= 0) &&
-                                            Directory.Exists(Path.Combine(l, @"Aion2\Content\Paks\L10N"))) {
+                                            IsGameRoot(l)) {
                                             AddTargetIfNotExists(results, "NCSoft PURPLE 客户端 (系统卸载表)", l);
                                         }
                                     }
@@ -678,7 +770,7 @@ namespace Aion2CN {
         // 判断当前客户端状态：只看那两个 Engine.locres 在不在、是不是本工具装的。
         // 游戏本体不自带松散 locres，所以「两个都不存在」就是官方英文原版。
         private string GetClientState(string root) {
-            if (!Directory.Exists(Path.Combine(root, @"Aion2\Content\Paks\L10N"))) return "目录无效";
+            if (!IsGameRoot(root)) return "目录无效";
 
             string zh = GetFileSha256(Path.Combine(zhDir, "Engine.locres"));
             string tw = GetFileSha256(Path.Combine(zhTwDir, "Engine.locres"));
@@ -723,7 +815,7 @@ namespace Aion2CN {
 
             // 只接受真正的 AION 2 客户端目录
             foreach (string root in targets) {
-                if (!Directory.Exists(Path.Combine(root, @"Aion2\Content\Paks\L10N"))) {
+                if (!IsGameRoot(root)) {
                     AppendLog("【拦截】不是有效的 AION 2 目录: " + root);
                     MessageBox.Show("不是有效的 AION 2 游戏目录：\n" + root +
                         "\n\n请在 Steam / PURPLE 中校验游戏文件完整性，再重新安装汉化。",

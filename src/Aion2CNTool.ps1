@@ -28,7 +28,7 @@ if ($Lang -eq 'zh-TW' -or $Lang -eq 'tw' -or $Lang -eq 'cht') {
     $ActiveSourceDir = $ZhTwDir
     $LangName = '繁体中文'
 }
-$CurrentVersion = '2.0.2'
+$CurrentVersion = '2.0.3'
 # 3393110 为 Steam 正式服 AppID，4972320 为 Steam Playtest 测试服 AppID
 $AppIds         = @('3393110', '4972320')
 $RemoteVersionUrl   = 'https://raw.githubusercontent.com/duoluoyuji/Aion2-EN-CN/main/version.json'
@@ -40,7 +40,7 @@ function Get-Sha256([string]$Path) {
 }
 
 function Get-ClientState([string]$Root) {
-    if (-not (Test-Path (Join-Path $Root "Aion2\Content\Paks\L10N"))) { return '目录无效' }
+    if (-not (Test-GameRoot $Root)) { return '目录无效' }
 
     $zh = Get-Sha256 (Join-Path $ZhDir 'Engine.locres')
     $tw = Get-Sha256 (Join-Path $ZhTwDir 'Engine.locres')
@@ -140,6 +140,33 @@ function Check-Update {
     }
 }
 
+# ==================== 路径识别（不依赖任何固定盘符） ====================
+function Test-GameRoot([string]$p) {
+    if (-not $p) { return $false }
+    if (Test-Path (Join-Path $p 'Aion2\Content\Paks')) { return $true }
+    return $false
+}
+
+# 把用户选中的目录纠正成真正的游戏根目录（兼容选到 Aion2 子目录、common、steamapps）
+function Resolve-GameRoot([string]$sel) {
+    if (-not $sel) { return $null }
+    $sel = $sel.TrimEnd('\', '/')
+    if ((Split-Path $sel -Leaf) -eq 'steamapps') { $sel = Join-Path $sel 'common' }
+    $cands = @($sel)
+    $p1 = Split-Path $sel -Parent
+    if ($p1) { $cands += $p1 }
+    $p2 = Split-Path $p1 -Parent
+    if ($p2) { $cands += $p2 }
+    foreach ($c in $cands) {
+        if (Test-GameRoot $c) { return $c }
+        if (Test-Path $c) {
+            $subs = @(Get-ChildItem -LiteralPath $c -Directory -ErrorAction SilentlyContinue | Where-Object { Test-GameRoot $_.FullName })
+            if ($subs.Count -eq 1) { return $subs[0].FullName }
+        }
+    }
+    return $null
+}
+
 # ==================== 扫描全盘所有已安装的 AION 2 版本 ====================
 function Get-AllGameRoots {
     $detected = @()
@@ -168,6 +195,31 @@ function Get-AllGameRoots {
         }
     } catch {}
 
+    # 1.1 读取 Steam 库清单 libraryfolders.vdf，兼容「自定义名字/其它盘」的游戏库
+    $vdfFiles = @()
+    foreach ($sr in $steamRoots) {
+        $vdfFiles += (Join-Path (Split-Path $sr -Parent) 'config\libraryfolders.vdf')
+    }
+    try {
+        $reg2 = Get-ItemProperty -Path "HKCU:\Software\Valve\Steam" -ErrorAction SilentlyContinue
+        if ($reg2 -and $reg2.SteamPath) {
+            $sp = $reg2.SteamPath.ToString().Replace('/', '\')
+            $vdfFiles += (Join-Path $sp 'config\libraryfolders.vdf')
+        }
+    } catch {}
+    foreach ($v in ($vdfFiles | Select-Object -Unique)) {
+        if (Test-Path $v) {
+            try {
+                $vt = [System.IO.File]::ReadAllText($v)
+                foreach ($m in [regex]::Matches($vt, '"path"\s+"([^"]+)"')) {
+                    $libPath = $m.Groups[1].Value.Replace('\\', '\')
+                    $sa = Join-Path $libPath 'steamapps'
+                    if (Test-Path $sa) { $steamRoots += $sa }
+                }
+            } catch {}
+        }
+    }
+
     $steamRoots = $steamRoots | Select-Object -Unique
 
     foreach ($r in $steamRoots) {
@@ -178,7 +230,7 @@ function Get-AllGameRoots {
                     $txt = Get-Content $acf -Raw -ErrorAction SilentlyContinue
                     if ($txt -match '"installdir"\s+"([^"]+)"') {
                         $gameAbs = Join-Path (Join-Path $r 'common') $matches[1]
-                        if (Test-Path (Join-Path $gameAbs 'Aion2\Content\Paks\L10N')) {
+                        if (Test-GameRoot $gameAbs) {
                             $label = if ($aid -eq '3393110') { "Steam 国际正式版" } else { "Steam 测试服版" }
                             if (-not ($detected | Where-Object { $_.Path.ToLower() -eq $gameAbs.ToLower() })) {
                                 $detected += [PSCustomObject]@{
@@ -196,7 +248,7 @@ function Get-AllGameRoots {
         $common = Join-Path $r 'common'
         if (Test-Path $common) {
             $hits = Get-ChildItem $common -Directory -ErrorAction SilentlyContinue | Where-Object {
-                Test-Path (Join-Path $_.FullName 'Aion2\Content\Paks\L10N')
+                Test-GameRoot $_.FullName
             }
             foreach ($h in $hits) {
                 if (-not ($detected | Where-Object { $_.Path.ToLower() -eq $h.FullName.ToLower() })) {
@@ -225,7 +277,7 @@ function Get-AllGameRoots {
                     $props = Get-ItemProperty -Path $sk.PSPath -ErrorAction SilentlyContinue
                     if ($props -and $props.BaseDir) {
                         $bPath = $props.BaseDir.ToString().TrimEnd('\')
-                        if (Test-Path (Join-Path $bPath 'Aion2\Content\Paks\L10N')) {
+                        if (Test-GameRoot $bPath) {
                             if (-not ($detected | Where-Object { $_.Path.ToLower() -eq $bPath.ToLower() })) {
                                 $detected += [PSCustomObject]@{
                                     Platform = "NCSoft PURPLE 国际服 (注册表定位)"
@@ -257,7 +309,7 @@ function Get-AllGameRoots {
                         $iLoc = $props.InstallLocation
                         if ($dName -and ($dName -like "*AION*" -or $dName -like "*Purple*") -and $iLoc) {
                             $cleanLoc = $iLoc.ToString().TrimEnd('\')
-                            if (Test-Path (Join-Path $cleanLoc 'Aion2\Content\Paks\L10N')) {
+                            if (Test-GameRoot $cleanLoc) {
                                 if (-not ($detected | Where-Object { $_.Path.ToLower() -eq $cleanLoc.ToLower() })) {
                                     $detected += [PSCustomObject]@{
                                         Platform = "NCSoft PURPLE 国际服 (系统识别)"
@@ -290,7 +342,7 @@ function Get-AllGameRoots {
             (Join-Path $d 'Program Files (x86)\NCSOFT\Purple\AION 2')
         )
         foreach ($pc in $purpleCandidates) {
-            if (Test-Path (Join-Path $pc 'Aion2\Content\Paks\L10N')) {
+            if (Test-GameRoot $pc) {
                 if (-not ($detected | Where-Object { $_.Path.ToLower() -eq $pc.ToLower() })) {
                     $detected += [PSCustomObject]@{
                         Platform = "NCSoft PURPLE 国际服 (磁盘扫描)"
@@ -302,20 +354,53 @@ function Get-AllGameRoots {
         }
     }
 
+    # ---------------- 3. 兜底：每个盘浅层看两层目录，兼容任意自定义安装位置 ----------------
+    $skipNames = @('Windows', '$Recycle.Bin', 'System Volume Information', 'Config.Msi', 'Recovery', 'PerfLogs', 'AppData')
+    foreach ($d in $fixedDrives) {
+        $tops = @()
+        try { $tops = @(Get-ChildItem -LiteralPath $d -Directory -ErrorAction SilentlyContinue) } catch { continue }
+        foreach ($t in $tops) {
+            if ($skipNames -contains $t.Name) { continue }
+            if (Test-GameRoot $t.FullName) {
+                if (-not ($detected | Where-Object { $_.Path.ToLower() -eq $t.FullName.ToLower() })) {
+                    $detected += [PSCustomObject]@{
+                        Platform = "磁盘扫描 ($($t.Name))"
+                        Path     = $t.FullName
+                        Type     = "Local"
+                    }
+                }
+                continue
+            }
+            try {
+                foreach ($g in @(Get-ChildItem -LiteralPath $t.FullName -Directory -ErrorAction SilentlyContinue)) {
+                    if (Test-GameRoot $g.FullName) {
+                        if (-not ($detected | Where-Object { $_.Path.ToLower() -eq $g.FullName.ToLower() })) {
+                            $detected += [PSCustomObject]@{
+                                Platform = "磁盘扫描 ($($t.Name)\$($g.Name))"
+                                Path     = $g.FullName
+                                Type     = "Local"
+                            }
+                        }
+                    }
+                }
+            } catch {}
+        }
+    }
+
     return $detected
 }
 
 # 手动选择游戏目录保底
 function Select-GameFolder {
     $dlg = New-Object System.Windows.Forms.FolderBrowserDialog
-    $dlg.Description = "未自动检测到游戏安装位置。`n请手动选择 AION 2 游戏根目录（包含 Aion2 文件夹的那一层，名字通常为 AION 2 或 AION 2 Playtest）："
+    $dlg.Description = "未自动检测到游戏安装位置。请选择游戏目录（选 AION 2、Aion2、common 或 steamapps 都可以，工具会自动纠正）："
     $dlg.ShowNewFolderButton = $false
     if ($dlg.ShowDialog() -eq 'OK') {
-        $sel = $dlg.SelectedPath
-        if (Test-Path (Join-Path $sel 'Aion2\Content\Paks\L10N')) {
-            return $sel
+        $root = Resolve-GameRoot $dlg.SelectedPath
+        if ($root) {
+            return $root
         } else {
-            [System.Windows.Forms.MessageBox]::Show("所选目录不是有效的 AION 2 游戏根目录！`n该目录下必须包含 Aion2 文件夹。", "错误 - B站@吃素的佩奇", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+            [System.Windows.Forms.MessageBox]::Show("所选目录里没有 Aion2\Content\Paks，不是 AION 2 游戏目录。`n`n最简单的办法：Steam 里右键游戏 → 管理 → 浏览本地文件，复制地址栏里的路径，再在本窗口选择它。", "路径不正确 - B站@吃素的佩奇", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning)
             return $null
         }
     }
