@@ -1,5 +1,5 @@
 {
-  "version": "2.0.4",
-  "announcement": "v2.0.4：修正全新客户端安装失败（未能找到路径 Localization\\Engine.locres.new），窗口版现在会自动创建目录。",
+  "version": "2.1.2",
+  "announcement": "v2.1.2：跟进 11/11、11/18 两次游戏更新，补齐任务、NPC 对话、技能说明与新副本文本；修复选服界面底部 4 行提示、深渊区域长说明等 477 条文本仍显示英文的问题。",
   "download": "https://github.com/duoluoyuji/Aion2-EN-CN/releases/latest"
 }

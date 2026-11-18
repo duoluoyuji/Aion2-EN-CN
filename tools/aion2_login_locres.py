@@ -113,8 +113,13 @@ def w_str(s):
 
 
 def src_hash(s):
-    """UE SourceStringHash：CRC32(UTF-32LE)"""
-    return zlib.crc32(b''.join(bytes([c, 0, 0, 0]) for c in s.encode('utf-8'))) & 0xFFFFFFFF
+    """UE SourceStringHash：CRC32(UTF-32LE)
+
+    必须按 Unicode 码点编码成 4 字节小端后再算 CRC32。
+    旧写法把 UTF-8 的每个字节零扩展成 4 字节，纯 ASCII 串结果相同，
+    一旦出现 — ’ ※ 等非 ASCII 字符就会算错，导致该条目在游戏里查不到译文。
+    """
+    return zlib.crc32(s.encode('utf-32-le')) & 0xFFFFFFFF
 
 
 def build_locres(groups):
